@@ -271,9 +271,15 @@ CC_PROCESSOR['CyberSource']['PURCHASE_ENDPOINT'] = os.environ.get('CYBERSOURCE_P
 ########################## USER API ########################
 EDX_API_KEY = None
 
-
 ####################### Shoppingcart ###########################
 MITX_FEATURES['ENABLE_SHOPPING_CART'] = True
+
+########################## QUERYABLE TABLES ########################
+INSTALLED_APPS += ('queryable_student_module',)
+
+########################## CLASS DASHBOARD ########################
+INSTALLED_APPS += ('class_dashboard',)
+MITX_FEATURES['CLASS_DASHBOARD'] = True
 
 #####################################################################
 # Lastly, see if the developer has any local overrides.
