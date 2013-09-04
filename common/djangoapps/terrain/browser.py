@@ -88,7 +88,6 @@ def initial_setup(server):
     """
     Launch the browser once before executing the tests.
     """
-    # from nose.tools import set_trace; set_trace()
     world.absorb(settings.SAUCE.get('SAUCE_ENABLED'), 'SAUCE_ENABLED')
 
     if not world.SAUCE_ENABLED:
