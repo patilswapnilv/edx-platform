@@ -19,8 +19,6 @@ from terrain.browser import reset_data
 
 TEST_ROOT = settings.COMMON_TEST_DATA_ROOT
 
-###########  STEP HELPERS ##############
-
 
 @step('I (?:visit|access|open) the Studio homepage$')
 def i_visit_the_studio_homepage(_step):
@@ -66,20 +64,21 @@ def select_new_course(_step, whom):
 
 @step(u'I press the "([^"]*)" notification button$')
 def press_the_notification_button(_step, name):
-    css = 'a.action-%s' % name.lower()
-
     # The button was clicked if either the notification bar is gone,
     # or we see an error overlaying it (expected for invalid inputs).
     def button_clicked():
         confirmation_dismissed = world.is_css_not_present('.is-shown.wrapper-notification-warning')
         error_showing = world.is_css_present('.is-shown.wrapper-notification-error')
         return confirmation_dismissed or error_showing
+
+    css = 'a.action-%s' % name.lower()
     if world.is_firefox():
         # This is done to explicitly make the changes save on firefox.  It will remove focus from the previously focused element
         world.trigger_event(css, event='focus')
         world.browser.execute_script("$('{}').click()".format(css))
     else:
-        world.css_click(css, success_condition=button_clicked), '%s button not clicked after 5 attempts.' % name
+        world.css_click(css, delay=.5)
+    assert button_clicked
 
 
 @step('I change the "(.*)" field to "(.*)"$')
@@ -110,7 +109,6 @@ def i_see_a_confirmation(step):
     assert world.is_css_present(confirmation_css)
 
 
-####### HELPER FUNCTIONS ##############
 def open_new_course():
     world.clear_courses()
     create_studio_user()
@@ -158,6 +156,7 @@ def log_into_studio(
     world.visit('/')
 
     assert uname in world.css_text('h2.title', max_attempts=15)
+
 
 def create_a_course():
     course = world.CourseFactory.create(org='MITx', course='999', display_name='Robot Super Course')
@@ -242,7 +241,8 @@ def save_button_disabled(step):
 @step('I confirm the prompt')
 def confirm_the_prompt(step):
     prompt_css = 'a.button.action-primary'
-    world.css_click(prompt_css, success_condition=lambda: not world.css_visible(prompt_css))
+    world.css_click(prompt_css)
+    assert world.is_css_not_present(prompt_css)
 
 
 @step(u'I am shown a (.*)$')
