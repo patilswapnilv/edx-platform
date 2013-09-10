@@ -5,7 +5,7 @@ from lettuce import world
 import time
 import platform
 from urllib import quote_plus
-from selenium.common.exceptions import WebDriverException, StaleElementReferenceException
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -16,11 +16,6 @@ from nose.tools import assert_true  # pylint: disable=E0611
 @world.absorb
 def wait(seconds):
     time.sleep(float(seconds))
-
-
-@world.absorb
-def wait_for(func, wait_time=5):
-    WebDriverWait(world.browser.driver, wait_time).until(func)
 
 
 @world.absorb
@@ -49,51 +44,72 @@ def css_has_text(css_selector, text, index=0, max_attempts=5):
 
 
 @world.absorb
-def css_find(css, wait_time=5):
-    def is_present(_driver):
-        return EC.presence_of_element_located((By.CSS_SELECTOR, css,))
+def wait_for(func, timeout=5):
+    WebDriverWait(world.browser.driver, timeout).until(func)
 
-    wait_for(is_present, wait_time)
+
+def wait_for_present(css_selector, timeout=30):
+    """
+    Waiting for the element to be present in the DOM.
+    Throws an error if the wait_for time expires.
+    Otherwise this method will return None
+    """
+    WebDriverWait(driver=world.browser.driver,
+        timeout=60).until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector,)))
+
+
+def wait_for_visible(css_selector, timeout=30, delay=0):
+    """
+    Waiting for the element to be visible in the DOM.
+    Throws an error if the wait_for time expires.
+    Otherwise this method will return None
+    """
+    wait(delay)
+    WebDriverWait(driver=world.browser.driver,
+        timeout=timeout).until(EC.visibility_of_element_located((By.CSS_SELECTOR, css_selector,)))
+
+
+def wait_for_clickable(css_selector, timeout=30, delay=0):
+    """
+    Waiting for the element to be present and clickable.
+    Throws an error if the wait_for time expires.
+    Otherwise this method will return None
+    """
+    # Sometimes the element is clickable then gets obscured.
+    # In this case, pause so that it is not reported clickable too early
+    wait(delay)
+    WebDriverWait(world.browser.driver,
+        timeout=timeout).until(EC.element_to_be_clickable((By.CSS_SELECTOR, css_selector,)))
+
+
+@world.absorb
+def css_find(css, wait_time=30):
+    wait_for_present(css_selector=css, timeout=wait_time)
     return world.browser.find_by_css(css)
 
 
 @world.absorb
-def wait_for_clickable(css_selector, wait_time=5, delay=0):
-    """
-    Waiting for the element to be present and clickable.
-    Throws an error if the wait_for time expires.
-    """
-    def is_clickable(_driver):
-        return EC.element_to_be_clickable((By.CSS_SELECTOR, css_selector,))
-
-    assert is_css_present(css_selector, wait_time=wait_time), "{} is not present".format(css_selector)
-    # Sometimes the element is clickable then gets obscured.
-    # In this case, pause so that it is not reported clickable too early
-    wait(delay)
-    wait_for(func=is_clickable, wait_time=wait_time)
-
-
-@world.absorb
-def css_click(css_selector, index=0, wait_time=5, delay=0):
+def css_click(css_selector, index=0, wait_time=30, delay=0):
     """
     Perform a click on a CSS selector, first waiting for the element
     to be present and clickable.
 
-    This function will return True if the click worked.
+    This method will return True if the click worked.
     """
-    wait_for_clickable(css_selector, wait_time=wait_time, delay=delay)
+    wait_for_clickable(css_selector, timeout=wait_time, delay=delay)
     return world.css_find(css_selector)[index].click()
 
 
 @world.absorb
-def css_check(css_selector, index=0, wait_time=5):
+def css_check(css_selector, index=0, wait_time=30, delay=0):
     """
     Checks a check box based on a CSS selector, first waiting for the element
-    to be present and clickable.
+    to be present and clickable. This is just a wrapper for calling "click"
+    because that's how selenium interacts with check boxes and radio buttons.
 
-    This function will return True if the check worked.
+    This method will return True if the check worked.
     """
-    return css_click(css_selector, index, wait_time)
+    return css_click(css_selector, index, wait_time, delay)
 
 
 @world.absorb
