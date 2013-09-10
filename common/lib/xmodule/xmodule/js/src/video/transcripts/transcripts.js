@@ -380,20 +380,36 @@
 
             var entry = $(event.currentTarget).val(),
                 data = Transcripts.Utils.parseLink(entry),
+                isNotEmpty = Boolean(entry),
                 $el = $(event.currentTarget);
 
-            if (this.checkValidity(data)) {
+            if (this.checkValidity(data, isNotEmpty)) {
                 this.updateModel();
             } else if ($el.hasClass('videolist-url')){
                 this.closeAdditional();
             }
         },
 
-        checkValidity: function(data){
+        isUniq: function (dataList) {
+            var arr = _.pluck(dataList, 'type'),
+                uniqArr = _.uniq(arr);
+
+            return arr.length === uniqArr.length;
+        },
+
+        checkValidity: function(data, showErrorModeMessage) {
             var self = this,
                 dataList = this.getVideoObjectsList();
 
-            if (data.mode === 'incorrect') {
+            if (!this.isUniq(dataList)){
+                this.messanger
+                    .render('not_found')
+                    .showError('Link types should be unique.', true);
+
+                return false;
+            }
+
+            if (data.mode === 'incorrect' && showErrorModeMessage) {
                 this.messanger
                     .render('not_found')
                     .showError('Incorrect url format.', true);
@@ -427,6 +443,7 @@
             if (this.xhr && this.xhr.abort) {
                 this.xhr.abort();
             }
+
             this.xhr = $.ajax({
                 url: '/check_subtitles',
                 data: data,
