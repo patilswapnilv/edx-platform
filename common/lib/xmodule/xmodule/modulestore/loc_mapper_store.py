@@ -100,6 +100,7 @@ class LocMapperStore(object):
             'prod_branch': prod_branch,
             'block_map': block_map or {},
         })
+        return course_id
 
     def translate_location(self, old_style_course_id, location, published=True, add_entry_if_missing=True):
         """
