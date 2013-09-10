@@ -3,6 +3,7 @@ Created on Mar 25, 2013
 
 @author: dmitchell
 '''
+import sys
 import datetime
 import subprocess
 import unittest
@@ -11,12 +12,16 @@ from importlib import import_module
 
 from xblock.fields import Scope
 from xmodule.course_module import CourseDescriptor
-from xmodule.modulestore.exceptions import InsufficientSpecificationError, ItemNotFoundError, VersionConflictError
+from xmodule.modulestore.exceptions import InsufficientSpecificationError, ItemNotFoundError, VersionConflictError, \
+    DuplicateItemError
 from xmodule.modulestore.locator import CourseLocator, BlockUsageLocator, VersionTree, DescriptionLocator
 from xmodule.modulestore.inheritance import InheritanceMixin
 from pytz import UTC
 from path import path
 import re
+import random
+from xmodule.modulestore.loc_mapper_store import LocMapperStore
+import mock
 
 
 class SplitModuleTest(unittest.TestCase):
@@ -56,6 +61,7 @@ class SplitModuleTest(unittest.TestCase):
     GUID_D4 = "1d00000000000000dddd4444"  # v23456d0
     GUID_D5 = "1d00000000000000dddd5555"  # v345679d
     GUID_P = "1d00000000000000eeee0000"  # v23456p
+    _cached_django = None
 
     @staticmethod
     def bootstrapDB():
@@ -85,6 +91,12 @@ class SplitModuleTest(unittest.TestCase):
                 raise Exception("DB did not init correctly")
 
     @classmethod
+    def setUpClass(cls):
+        if 'xmodule.modulestore.django' in sys.modules:
+            cls._cached_django = sys.modules['xmodule.modulestore.django']
+        sys.modules['xmodule.modulestore.django'] = mock.Mock(loc_mapper=loc_mapper)
+
+    @classmethod
     def tearDownClass(cls):
         collection_prefix = SplitModuleTest.MODULESTORE['OPTIONS']['collection'] + '.'
         if SplitModuleTest.modulestore:
@@ -92,6 +104,10 @@ class SplitModuleTest(unittest.TestCase):
                 modulestore().db.drop_collection(collection_prefix + collection)
             # drop the modulestore to force re init
             SplitModuleTest.modulestore = None
+        if cls._cached_django:
+            sys.modules['xmodule.modulestore.django'] = cls._cached_django
+        else:
+            del sys.modules['xmodule.modulestore.django']
 
     def findByIdInResult(self, collection, _id):
         """
@@ -604,7 +620,91 @@ class TestItemCrud(SplitModuleTest):
         self.assertGreaterEqual(new_history['edited_on'], premod_time)
         another_history = modulestore().get_definition_history_info(another_module.definition_locator)
         self.assertEqual(another_history['previous_version'], 'problem12345_3_1')
-    # TODO check that default fields are set
+
+    def test_create_continue_version(self):
+        """
+        Test create_item using the continue_version flag
+        """
+        # start transaction w/ simple creation
+        user = random.getrandbits(32)
+        new_course = modulestore().create_course('test_org', 'test_transaction', user)
+        new_course_locator = new_course.location.as_course_locator()
+        index_history_info = modulestore().get_course_history_info(new_course.location)
+        course_block_prev_version = new_course.previous_version
+        course_block_update_version = new_course.update_version
+        self.assertIsNotNone(new_course_locator.version_guid, "Want to test a definite version")
+        versionless_course_locator = CourseLocator(
+            course_id=new_course_locator.course_id, branch=new_course_locator.branch
+        )
+
+        # positive simple case: no force, add chapter
+        new_ele = modulestore().create_item(
+            new_course.location, 'chapter', user,
+            fields={'display_name': 'chapter 1'},
+            continue_version=True
+        )
+        # version info shouldn't change
+        self.assertEqual(new_ele.update_version, course_block_update_version)
+        self.assertEqual(new_ele.update_version, new_ele.location.version_guid)
+        refetch_course = modulestore().get_course(versionless_course_locator)
+        self.assertEqual(refetch_course.location.version_guid, new_course.location.version_guid)
+        self.assertEqual(refetch_course.previous_version, course_block_prev_version)
+        self.assertEqual(refetch_course.update_version, course_block_update_version)
+        refetch_index_history_info = modulestore().get_course_history_info(refetch_course.location)
+        self.assertEqual(refetch_index_history_info, index_history_info)
+        self.assertIn(new_ele.location.usage_id, refetch_course.children)
+
+        # try to create existing item
+        with self.assertRaises(DuplicateItemError):
+            _fail = modulestore().create_item(
+                new_course.location, 'chapter', user,
+                usage_id=new_ele.location.usage_id,
+                fields={'display_name': 'chapter 2'},
+                continue_version=True
+            )
+
+        # ensure force w/ continue gives exception
+        with self.assertRaises(VersionConflictError):
+            _fail = modulestore().create_item(
+                new_course.location, 'chapter', user,
+                fields={'display_name': 'chapter 2'},
+                force=True, continue_version=True
+            )
+
+        # start a new transaction
+        new_ele = modulestore().create_item(
+            new_course.location, 'chapter', user,
+            fields={'display_name': 'chapter 2'},
+            continue_version=False
+        )
+        transaction_guid = new_ele.location.version_guid
+        # ensure trying to continue the old one gives exception
+        with self.assertRaises(VersionConflictError):
+            _fail = modulestore().create_item(
+                new_course.location, 'chapter', user,
+                fields={'display_name': 'chapter 3'},
+                continue_version=True
+            )
+
+        # add new child to old parent in continued (leave off version_guid)
+        course_module_locator = BlockUsageLocator(
+            course_id=new_course.location.course_id,
+            usage_id=new_course.location.usage_id,
+            branch=new_course.location.branch
+        )
+        new_ele = modulestore().create_item(
+            course_module_locator, 'chapter', user,
+            fields={'display_name': 'chapter 4'},
+            continue_version=True
+        )
+        self.assertNotEqual(new_ele.update_version, course_block_update_version)
+        self.assertEqual(new_ele.location.version_guid, transaction_guid)
+
+        # check children, previous_version
+        refetch_course = modulestore().get_course(versionless_course_locator)
+        self.assertIn(new_ele.location.usage_id, refetch_course.children)
+        self.assertEqual(refetch_course.previous_version, course_block_update_version)
+        self.assertEqual(refetch_course.update_version, transaction_guid)
 
     def test_update_metadata(self):
         """
@@ -1016,3 +1116,19 @@ def modulestore():
 # pylint: disable=W0613
 def render_to_template_mock(*args):
     pass
+
+
+# pull loc_mapper here b/c we don't want to load django to do this test
+_loc_singleton = None
+def loc_mapper():
+    """
+    Get the loc mapper which bidirectionally maps Locations to Locators. Used like modulestore() as
+    a singleton accessor.
+    """
+    # pylint: disable=W0603
+    global _loc_singleton
+    # pylint: disable=W0212
+    if _loc_singleton is None:
+        # instantiate
+        _loc_singleton = LocMapperStore(SplitModuleTest.modulestore_options)
+    return _loc_singleton

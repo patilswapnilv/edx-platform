@@ -626,7 +626,7 @@ class SplitMongoModuleStore(ModuleStoreBase):
         else:
             return id_root
 
-    # TODO Should I rewrite this to take a new xblock instance rather than to construct it? That is, require the
+    # DHM: Should I rewrite this to take a new xblock instance rather than to construct it? That is, require the
     # caller to use XModuleDescriptor.load_from_json thus reducing similar code and making the object creation and
     # validation behavior a responsibility of the model layer rather than the persistence layer.
     def create_item(self, course_or_parent_locator, category, user_id,

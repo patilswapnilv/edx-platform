@@ -1,7 +1,6 @@
 """
 Exceptions thrown by KeyStore objects
 """
-from xmodule.modulestore.django import modulestore
 
 
 class ItemNotFoundError(Exception):
@@ -32,10 +31,10 @@ class DuplicateItemError(Exception):
     """
     Attempted to create an item which already exists.
     """
-    def __init__(self, element_id, store=modulestore(), collection=None):
+    def __init__(self, element_id, store=None, collection=None):
         super(DuplicateItemError, self).__init__()
         self.element_id = element_id
-        self.store = store
+        self.store = store or {'db': 'unset'}
         self.collection = collection
 
     def __unicode__(self):
