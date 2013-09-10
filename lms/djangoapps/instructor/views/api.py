@@ -33,7 +33,7 @@ import instructor_task.api
 from instructor_task.api_helper import AlreadyRunningError
 import instructor.enrollment as enrollment
 from instructor.enrollment import enroll_email, unenroll_email
-from instructor.views.tools import _clean_field
+from instructor.views.tools import strip_if_string
 import instructor.access as access
 import analytics.basic
 import analytics.distributions
@@ -235,7 +235,7 @@ def modify_access(request, course_id):
         request.user, course_id, 'instructor', depth=None
     )
 
-    email = _clean_field(request.GET.get('email'))
+    email = strip_if_string(request.GET.get('email'))
     rolename = request.GET.get('rolename')
     action = request.GET.get('action')
 
@@ -435,7 +435,7 @@ def get_student_progress_url(request, course_id):
         'progress_url': '/../...'
     }
     """
-    student_email = _clean_field(request.GET.get('student_email'))
+    student_email = strip_if_string(request.GET.get('student_email'))
     user = User.objects.get(email=student_email)
 
     progress_url = reverse('student_progress', kwargs={'course_id': course_id, 'student_id': user.id})
@@ -476,8 +476,8 @@ def reset_student_attempts(request, course_id):
         request.user, course_id, 'staff', depth=None
     )
 
-    problem_to_reset = _clean_field(request.GET.get('problem_to_reset'))
-    student_email = _clean_field(request.GET.get('student_email'))
+    problem_to_reset = strip_if_string(request.GET.get('problem_to_reset'))
+    student_email = strip_if_string(request.GET.get('student_email'))
     all_students = request.GET.get('all_students', False) in ['true', 'True', True]
     delete_module = request.GET.get('delete_module', False) in ['true', 'True', True]
 
@@ -533,8 +533,8 @@ def rescore_problem(request, course_id):
 
     all_students and student_email cannot both be present.
     """
-    problem_to_reset = _clean_field(request.GET.get('problem_to_reset'))
-    student_email = _clean_field(request.GET.get('student_email', False))
+    problem_to_reset = strip_if_string(request.GET.get('problem_to_reset'))
+    student_email = strip_if_string(request.GET.get('student_email', False))
     all_students = request.GET.get('all_students') in ['true', 'True', True]
 
     if not (problem_to_reset and (all_students or student_email)):
@@ -578,8 +578,8 @@ def list_instructor_tasks(request, course_id):
         - `problem_urlname` and `student_email` lists task
             history for problem AND student (intersection)
     """
-    problem_urlname = _clean_field(request.GET.get('problem_urlname', False))
-    student_email = _clean_field(request.GET.get('student_email', False))
+    problem_urlname = strip_if_string(request.GET.get('problem_urlname', False))
+    student_email = strip_if_string(request.GET.get('student_email', False))
 
     if student_email and not problem_urlname:
         return HttpResponseBadRequest(
@@ -695,7 +695,7 @@ def update_forum_role_membership(request, course_id):
         request.user, course_id, FORUM_ROLE_ADMINISTRATOR
     )
 
-    email = _clean_field(request.GET.get('email'))
+    email = strip_if_string(request.GET.get('email'))
     rolename = request.GET.get('rolename')
     action = request.GET.get('action')
 
