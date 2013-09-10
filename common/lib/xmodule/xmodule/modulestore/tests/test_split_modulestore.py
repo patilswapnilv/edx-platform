@@ -3,7 +3,6 @@ Created on Mar 25, 2013
 
 @author: dmitchell
 '''
-import sys
 import datetime
 import subprocess
 import unittest
@@ -20,8 +19,6 @@ from pytz import UTC
 from path import path
 import re
 import random
-from xmodule.modulestore.loc_mapper_store import LocMapperStore
-import mock
 
 
 class SplitModuleTest(unittest.TestCase):
@@ -61,7 +58,6 @@ class SplitModuleTest(unittest.TestCase):
     GUID_D4 = "1d00000000000000dddd4444"  # v23456d0
     GUID_D5 = "1d00000000000000dddd5555"  # v345679d
     GUID_P = "1d00000000000000eeee0000"  # v23456p
-    _cached_django = None
 
     @staticmethod
     def bootstrapDB():
@@ -91,12 +87,6 @@ class SplitModuleTest(unittest.TestCase):
                 raise Exception("DB did not init correctly")
 
     @classmethod
-    def setUpClass(cls):
-        if 'xmodule.modulestore.django' in sys.modules:
-            cls._cached_django = sys.modules['xmodule.modulestore.django']
-        sys.modules['xmodule.modulestore.django'] = mock.Mock(loc_mapper=loc_mapper)
-
-    @classmethod
     def tearDownClass(cls):
         collection_prefix = SplitModuleTest.MODULESTORE['OPTIONS']['collection'] + '.'
         if SplitModuleTest.modulestore:
@@ -104,10 +94,6 @@ class SplitModuleTest(unittest.TestCase):
                 modulestore().db.drop_collection(collection_prefix + collection)
             # drop the modulestore to force re init
             SplitModuleTest.modulestore = None
-        if cls._cached_django:
-            sys.modules['xmodule.modulestore.django'] = cls._cached_django
-        else:
-            del sys.modules['xmodule.modulestore.django']
 
     def findByIdInResult(self, collection, _id):
         """
@@ -266,6 +252,13 @@ class SplitModuleCourseTests(SplitModuleTest):
         self.assertEqual(str(result.children[0].locator.version_guid), self.GUID_D1)
         self.assertEqual(len(result.children[0].children), 1)
 
+    def test_create_with_root(self):
+        """
+        Test create_course with a specified root id
+        """
+        user = random.getrandbits(32)
+        new_course = modulestore().create_course('test_org', 'test_transaction', user, root_usage_id='top')
+        self.assertEqual(new_course.location.usage_id, 'top')
 
 class SplitModuleItemTests(SplitModuleTest):
     '''
@@ -508,7 +501,7 @@ class TestItemCrud(SplitModuleTest):
     """
     Test create update and delete of items
     """
-    # TODO do I need to test this case which I believe won't work:
+    # DHM do I need to test this case which I believe won't work:
     #  1) fetch a course and some of its blocks
     #  2) do a series of CRUD operations on those previously fetched elements
     # The problem here will be that the version_guid of the items will be the version at time of fetch.
@@ -1116,19 +1109,3 @@ def modulestore():
 # pylint: disable=W0613
 def render_to_template_mock(*args):
     pass
-
-
-# pull loc_mapper here b/c we don't want to load django to do this test
-_loc_singleton = None
-def loc_mapper():
-    """
-    Get the loc mapper which bidirectionally maps Locations to Locators. Used like modulestore() as
-    a singleton accessor.
-    """
-    # pylint: disable=W0603
-    global _loc_singleton
-    # pylint: disable=W0212
-    if _loc_singleton is None:
-        # instantiate
-        _loc_singleton = LocMapperStore(SplitModuleTest.modulestore_options)
-    return _loc_singleton

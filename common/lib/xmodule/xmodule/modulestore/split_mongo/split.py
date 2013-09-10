@@ -19,7 +19,8 @@ from xblock.fields import Scope
 from xblock.runtime import Mixologist
 from pytz import UTC
 import collections
-from xmodule.modulestore.django import loc_mapper
+# this odd import b/c importing modulestore.django screws up the unit tests
+from xmodule import modulestore
 
 log = logging.getLogger(__name__)
 #==============================================================================
@@ -318,7 +319,8 @@ class SplitMongoModuleStore(ModuleStoreBase):
         """
         # intended for temporary support of some pointers being old-style
         if isinstance(location, Location):
-            location = loc_mapper().translate_location(
+            # this fully spec'd path to keep tests from importing django
+            location = modulestore.django.loc_mapper().translate_location(
                 None, location, location.revision is None,
                 add_entry_if_missing=False
             )
