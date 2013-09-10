@@ -244,7 +244,7 @@ class LocMapperStore(object):
                 if usage_id is None:
                     usage_id = map_entry['block_map'][location.name][location.category]
                 elif usage_id != map_entry['block_map'][location.name][location.category]:
-                    raise DuplicateItemError()
+                    raise DuplicateItemError(usage_id, self, 'location_map')
 
         computed_usage_id = usage_id
 
@@ -257,7 +257,7 @@ class LocMapperStore(object):
                 alt_usage_id = self._verify_uniqueness(computed_usage_id, map_entry['block_map'])
                 if alt_usage_id != computed_usage_id:
                     if usage_id is not None:
-                        raise DuplicateItemError()
+                        raise DuplicateItemError(usage_id, self, 'location_map')
                     else:
                         # revise already set ones and add to remaining ones
                         computed_usage_id = self.update_block_location_translator(
@@ -301,7 +301,7 @@ class LocMapperStore(object):
                     usage_id = self.update_block_location_translator(location, alt_usage_id, old_course_id, True)
                     return usage_id
                 else:
-                    raise DuplicateItemError()
+                    raise DuplicateItemError(usage_id, self, 'location_map')
 
             if location.category in map_entry['block_map'].setdefault(location.name, {}):
                 map_entry['block_map'][location.name][location.category] = usage_id
