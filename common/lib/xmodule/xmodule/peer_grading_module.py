@@ -593,7 +593,7 @@ class PeerGradingModule(PeerGradingFields, XModule):
             'ajax_url': ajax_url,
             # Checked above
             'staff_access': False,
-            'track_changes': getattr(descriptor, 'track_changes', None),
+            'track_changes': getattr(descriptor, 'track_changes', False),
             'use_single_location': self.use_for_single_location,
         })
 
